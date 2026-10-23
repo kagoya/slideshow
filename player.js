@@ -1,4 +1,5 @@
 import {decrypt} from './crypto.js';
+import {initPattern} from './pattern.js?v=4';
 const $=id=>document.getElementById(id);let list=[],index=0,password='',timer=null,url=null,busy=false;
 async function refresh(){const r=await fetch('manifest.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('写真一覧を取得できません');list=(await r.json()).items;}
 async function show(step=0){if(busy||!password)return false;busy=true;$('status').textContent='写真を読み込み・復号しています…';try{if(!list.length)throw Error('写真がありません');index=(index+step+list.length)%list.length;const path=list[index];if(!/^photos\/[a-zA-Z0-9_-]+\.enc$/.test(path))throw Error('不正な写真パス');const r=await fetch(path);if(!r.ok)throw Error('写真を取得できません');const raw=await decrypt(await r.arrayBuffer(),password);const next=URL.createObjectURL(new Blob([raw],{type:'image/jpeg'}));const img=new Image();img.alt='スライド写真';img.src=next;try{await img.decode();}catch(e){URL.revokeObjectURL(next);throw Error('画像形式を表示できません');}if(url)URL.revokeObjectURL(url);url=next;$('stage').replaceChildren(img);$('status').textContent=`${index+1} / ${list.length}`;return true;}catch(e){stop();$('status').textContent='表示失敗：パスワード・通信を確認してください。 '+(e.message||'');return false;}finally{busy=false;}}
@@ -22,3 +23,19 @@ $('add').onclick=()=>{const u=new URL('upload.html',location.href);const q=new U
 setInterval(()=>{if(password)refresh().catch(()=>{});},60000);
 
 $('status').textContent='パスワードを入力し、「写真を開いて再生」または「再生」を押してください。';
+
+initPattern({
+ validatePassword:async()=>{
+  if(!$('password').value&&!password){$('status').textContent='初回登録のため、写真のパスワードを入力してください。';$('password').focus();return null;}
+  if(!await unlock())return null;
+  return password;
+ },
+ openPassword:async value=>{$('password').value=value;if(!await unlock())return false;start();return true;},
+ lockPhotos:()=>{
+  if(busy){$('status').textContent='写真の読み込み後にもう一度ロックしてください。';return false;}
+  stop();password='';$('password').value='';
+  if(url)URL.revokeObjectURL(url);url=null;
+  $('stage').textContent='パターンをなぞって写真を開いてください。';
+  $('status').textContent='ロック中';return true;
+ }
+});
