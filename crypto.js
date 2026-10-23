@@ -1,0 +1,5 @@
+export const iterations=600000;
+export async function key(password,salt){let material=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+export async function encrypt(bytes,password){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await key(password,salt),bytes));const out=new Uint8Array(32+cipher.length);out.set(new TextEncoder().encode('PS01'));out.set(salt,4);out.set(iv,20);out.set(cipher,32);return out;}
+export async function decrypt(bytes,password){let b=new Uint8Array(bytes);if(new TextDecoder().decode(b.slice(0,4))!=='PS01')throw Error('未対応の暗号形式');return crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(20,32)},await key(password,b.slice(4,20)),b.slice(32));}
+export function b64(bytes){let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(s);}

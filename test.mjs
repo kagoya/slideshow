@@ -1,0 +1,6 @@
+import fs from 'node:fs/promises';import assert from 'node:assert/strict';import vm from 'node:vm';
+const source=await fs.readFile(new URL('crypto.js',import.meta.url),'utf8');const {encrypt,decrypt}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+for(let i=1;i<=3;i++){const raw=await fs.readFile(new URL(`photos/sample${i}.enc`,import.meta.url));const image=new Uint8Array(await decrypt(raw,'Demo-Photo-2026!'));assert.equal(image[0],255);assert.equal(image[1],216);await assert.rejects(()=>decrypt(raw,'incorrect'));const corrupt=Uint8Array.from(raw);corrupt[40]^=1;await assert.rejects(()=>decrypt(corrupt,'Demo-Photo-2026!'));}
+const bytes=new TextEncoder().encode('private test');assert.deepEqual(new Uint8Array(await decrypt(await encrypt(bytes,'long-secret-password'),'long-secret-password')),bytes);
+const context={};vm.createContext(context);vm.runInContext(await fs.readFile(new URL('vendor/qrcode.js',import.meta.url),'utf8'),context);const qr=context.qrcode(0,'M');qr.addData('https://example.github.io/photo-slide/upload.html');qr.make();assert.ok(qr.createImgTag(4,8).includes('data:image/gif;base64,'));
+console.log('PASS: 3 sample JPEGs; wrong password and tamper rejection; encrypt/decrypt round trip; QR generation');
